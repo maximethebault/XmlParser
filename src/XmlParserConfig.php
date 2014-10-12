@@ -12,17 +12,29 @@ namespace Maximethebault\XmlParser;
 class XmlParserConfig
 {
     /**
+     * Element's tag name will be converted to lowercase
+     */
+    const XML_PARSER_CASE_LOWER = 0;
+    /**
+     * Element's tag name will stay untouched
+     */
+    const XML_PARSER_CASE_UNTOUCHED = 1;
+    /**
+     * Element's tag name will be converted to uppercase
+     */
+    const XML_PARSER_CASE_UPPER = 2;
+    /**
      * The Psr4-compliant class autoloader
      *
      * @var Psr4Autoloader
      */
     private $_autoloader;
     /**
-     * Whether to enable case folding (the parser will convert all tag names to lowercase before comparison)
+     * The case strategy to adopt for tag names
      *
      * @var bool
      */
-    private $_caseFolding = true;
+    private $_caseStrategy = self::XML_PARSER_CASE_UNTOUCHED;
 
     public function __construct() {
         $this->_autoloader = new Psr4Autoloader();
@@ -49,16 +61,21 @@ class XmlParserConfig
      *
      * @return boolean
      */
-    public function getCaseFolding() {
-        return $this->_caseFolding;
+    public function getCaseStrategy() {
+        return $this->_caseStrategy;
     }
 
     /**
-     * Whether to enable case folding (the parser will convert all tag names to lowercase before comparison)
+     * The case strategy to adopt for tag names
      *
-     * @param boolean $caseFolding
+     * @param boolean $caseStrategy
+     *
+     * @throws \Exception
      */
-    public function setCaseFolding($caseFolding) {
-        $this->_caseFolding = $caseFolding;
+    public function setCaseStrategy($caseStrategy) {
+        if($caseStrategy < 0 || $caseStrategy > 3) {
+            throw new \Exception('Wrong constant used for caseStrategy');
+        }
+        $this->_caseStrategy = $caseStrategy;
     }
 } 

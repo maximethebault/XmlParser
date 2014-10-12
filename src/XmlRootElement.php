@@ -11,8 +11,22 @@ namespace Maximethebault\XmlParser;
  */
 abstract class XmlRootElement extends XmlElement
 {
+    /**
+     * The XML parsing configuration to be used
+     *
+     * @var XmlParserConfig
+     */
+    private $_xmlParserConfig;
+    /**
+     * Whether the tag for the root element has been opened
+     *
+     * @var bool
+     */
+    private $_opened;
+
     public function __construct() {
         parent::__construct(null, null);
+        $this->_opened = false;
     }
 
     /**
@@ -25,9 +39,10 @@ abstract class XmlRootElement extends XmlElement
      * @return XmlElement the root element that was parsed, which gives access to the whole document thanks to the children accessors
      */
     public function parseXml($xmlParserConfig, $xmlData) {
+        $this->_xmlParserConfig = $xmlParserConfig;
         $parser = xml_parser_create();
         xml_set_object($parser, $this);
-        xml_parser_set_option($parser, XML_OPTION_CASE_FOLDING, $xmlParserConfig->getCaseFolding());
+        xml_parser_set_option($parser, XML_OPTION_CASE_FOLDING, 0);
         xml_set_element_handler($parser, 'tagOpen', 'tagClosed');
         xml_set_character_data_handler($parser, 'tagData');
 
@@ -43,40 +58,39 @@ abstract class XmlRootElement extends XmlElement
      * {@inheritdoc}
      */
     protected function tagOpen($parser, $tagName, $attrs) {
-        try {
-            if($this->_parsingObject) {
-                $this->_parsingObject->tagOpen($parser, $tagName, $attrs);
+        $tagName = $this->convertStrWithCaseStrategy($tagName);
+        if($this->_parsingObject) {
+            $this->_parsingObject->tagOpen($parser, $tagName, $attrs);
+        }
+        else {
+            if($tagName == $this->getName()) {
+                if($this->_opened) {
+                    throw new Exception\ParseException(xml_get_current_line_number($parser), 'Root tag "' . $this->getName() . '" is opened twice...');
+                }
+                $this->_opened = true;
             }
             else {
-                if($tagName == $this->getName()) {
-                    $this->_parsingObject = $this;
-                }
-                else {
-                    throw new \Exception('Unexpected tag "' . $tagName . '" at root');
-                }
+                parent::tagOpen($parser, $tagName, $attrs);
             }
         }
-        catch(\Exception $e) {
-            throw new Exception\ParseException(xml_get_current_line_number($parser), $e->getMessage(), 0, $e);
-        }
     }
 
     /**
-     * {@inheritdoc}
+     * Converts a string with respect to the configuration
+     *
+     * @param $str string the input string
+     *
+     * @return string the output string, converted accordingly
      */
-    protected function tagData($parser, $data) {
-        $this->tagData($parser, $data);
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    protected function tagClosed($parser, $tagName) {
-        try {
-            $this->tagClosed($parser, $tagName);
+    private function convertStrWithCaseStrategy($str) {
+        if($this->_xmlParserConfig->getCaseStrategy() === XmlParserConfig::XML_PARSER_CASE_LOWER) {
+            return strtolower($str);
         }
-        catch(\Exception $e) {
-            throw new Exception\ParseException(xml_get_current_line_number($parser), $e->getMessage(), 0, $e);
+        elseif($this->_xmlParserConfig->getCaseStrategy() === XmlParserConfig::XML_PARSER_CASE_UNTOUCHED) {
+            return $str;
+        }
+        elseif($this->_xmlParserConfig->getCaseStrategy() === XmlParserConfig::XML_PARSER_CASE_UPPER) {
+            return strtoupper($str);
         }
     }
 }

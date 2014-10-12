@@ -24,6 +24,7 @@ abstract class XmlElement
      *                    In the end, the parser will hold an unique object that gathers all of these complementary informations.
      *                    The value of this option must be the name of the attribute holding the unique identifier.
      *                    The cache's scope is limited to the XmlElement defining the cache_attr option and its children.
+     *      - class: class name, useful if namespaced
      *
      * Example :
      *
@@ -116,22 +117,19 @@ abstract class XmlElement
      */
     private $_attrs;
     /**
-     * Holds the XmlElement data, if any
+     * Holds the XmlElement data, if any.
+     * Usually a string, but becomes an array when we step into a duplicate element.
+     * When we step out of it, it becomes a string again, therefore, after the parser has been executed, it will always be a string.
      *
-     * @var string
+     * @var mixed
      */
     private $_data;
-    /**
-     * Whether the tag was closed
-     *
-     * @var bool
-     */
-    private $_closed;
 
     public function __construct($parent, $attrs) {
-        $this->_closed = false;
         $this->_parent = $parent;
         $this->_attrs = $attrs;
+        $this->_data = '';
+        $this->_opened = false;
         $this->_isCachedCache = array();
         $this->initChildren();
     }
@@ -203,12 +201,15 @@ abstract class XmlElement
                 if($relationName == $tagName) {
                     if($this->isCached($tagName)) {
                         $this->_parsingObject = & $this->getCachedElement($tagName, $attrs);
-                        $this->_parsingObject->_closed = false;
                     }
-                    else {
-                        $objectName = ucfirst($relationName);
+                    if(!$this->_parsingObject) {
+                        $objectName = $relationOptions['class'];
                         $this->_parsingObject = new $objectName($this, $attrs);
                     }
+                    else {
+                        $this->_parsingObject->openDuplicata($this, $attrs);
+                    }
+                    return;
                 }
             }
             throw new Exception\ParseException(xml_get_current_line_number($parser), 'Unexpected tag "' . $tagName . '" at ' . $this->getName());
@@ -224,10 +225,17 @@ abstract class XmlElement
      * @throws Exception\ParseException
      */
     protected function tagData($parser, $data) {
-        if(count($this->children)) {
-            throw new Exception\ParseException(xml_get_current_line_number($parser), 'Unexpected data at ' . $this->getName());
+        if($this->_parsingObject) {
+            $this->_parsingObject->tagData($parser, $data);
         }
-        $this->_data = $data;
+        else {
+            if(is_array($this->_data)) {
+                $this->_data[1] .= $data;
+            }
+            else {
+                $this->_data .= $data;
+            }
+        }
     }
 
     /**
@@ -276,6 +284,7 @@ abstract class XmlElement
                 }
 
                 if($this->isCached($tagName)) {
+                    $this->_parsingObject->closeDuplicate();
                     // in this case, $this->_parsingObject is a reference.
                     // if we set it to null, we'd erase our work. That's definitely not what we want!
                     // we need to unset it first.
@@ -295,11 +304,12 @@ abstract class XmlElement
      * @see $_children
      */
     private function initChildren() {
-        foreach($this->children as &$relationName => &$relationOptions) {
+        $normalizedChildren = array();
+        foreach($this->children as $relationName => $relationOptions) {
             // we normalize the children configuration and set the default value whenever possible
             if(!is_array($relationOptions)) {
                 $relationName = $relationOptions;
-                $relationOptions = array('multi' => false, 'accessor' => $relationName, 'cache_attr' => null);
+                $relationOptions = array('multi' => false, 'accessor' => $relationName, 'cache_attr' => null, 'class' => ucfirst($relationName));
             }
             else {
                 if(!array_key_exists('accessor', $relationOptions)) {
@@ -311,16 +321,18 @@ abstract class XmlElement
                 if(!array_key_exists('cache_attr', $relationOptions)) {
                     $relationOptions['cache_attr'] = null;
                 }
+                if(!array_key_exists('class', $relationOptions)) {
+                    $relationOptions['class'] = ucfirst($relationName);
+                }
             }
             // we initialize the array that will contain the children objects
             $this->_children[$relationOptions['accessor']] = $relationOptions['multi'] ? array() : null;
             if($relationOptions['cache_attr'] !== null) {
                 $this->_cachedElements[$relationName] = array();
             }
+            $normalizedChildren[$relationName] = $relationOptions;
         }
-        // good practice after a foreach with references
-        unset($relationName);
-        unset($relationOptions);
+        $this->children = $normalizedChildren;
     }
 
     /**
@@ -346,11 +358,11 @@ abstract class XmlElement
             }
         }
         $this->_isCachedCache[$tagName] = $isCached;
+        return $isCached;
     }
 
     /**
      * Returns the cached element that matches the given parameters
-     * If isCached($tagName) == true but getCachedElement($tagName, $attrs) == false, the element hasn't been cached yet.
      *
      * @param $tagName string tag name of the element
      * @param $attrs   array the array of the element's attributes
@@ -365,6 +377,16 @@ abstract class XmlElement
         }
         foreach($this->children as $relationName => $relationOptions) {
             if($relationName == $tagName && $relationOptions['cache_attr'] !== null) {
+                if(!array_key_exists($relationOptions['cache_attr'], $attrs)) {
+                    // the element can't be cached (required attribute is missing)
+                    // => we won't index it in the cachedElements array, but we return a reference anyway, as this method is supposed to, because we don't want to break the logic depending on that method
+                    $garbage = null;
+                    return $garbage;
+                }
+                if(!array_key_exists($attrs[$relationOptions['cache_attr']], $this->_cachedElements[$relationName])) {
+                    //the element hasn't been cached yet
+                    $this->_cachedElements[$relationName][$attrs[$relationOptions['cache_attr']]] = null;
+                }
                 return $this->_cachedElements[$relationName][$attrs[$relationOptions['cache_attr']]];
             }
         }
@@ -373,5 +395,42 @@ abstract class XmlElement
         }
         $parentCache = & $this->_parent->getCachedElement($tagName, $attrs);
         return $parentCache;
+    }
+
+    /**
+     * Called whenever a duplicate element of this former one is opened
+     *
+     * When this method is called, $this is the former opened element
+     *
+     * @param $parent XmlElement the parent of the new duplicate element
+     * @param $attrs  array the attribute array of the new duplicate element
+     */
+    private function openDuplicata($parent, $attrs) {
+        $this->_parent = $parent;
+        $this->mergeAttrs($attrs);
+        $this->_data = array($this->_data, '');
+    }
+
+    /**
+     * Merge the attributes of a duplicated element
+     *
+     * @param $attrs array the attributes we want to merge with the one of the current object
+     */
+    private function mergeAttrs($attrs) {
+        $this->_attrs = array_merge($this->_attrs, $attrs);
+    }
+
+    /**
+     * Called whenever a cached element is closed
+     */
+    private function closeDuplicate() {
+        if(is_array($this->_data)) {
+            if(strlen(trim($this->_data[0])) > strlen(trim($this->_data[1]))) {
+                $this->_data = $this->_data[0];
+            }
+            else {
+                $this->_data = $this->_data[1];
+            }
+        }
     }
 }
