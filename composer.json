@@ -1,0 +1,27 @@
+{
+    "name":         "maximethebault/XmlParser",
+    "authors":      [
+        {
+            "name":     "maximethebault",
+            "email":    "contact@maximethebault.me",
+            "homepage": "http://maximethebault.me",
+            "role":     "Developer"
+        }
+    ],
+    "repositories": [
+        {
+            "type": "vcs",
+            "url":  "https://github.com/maximethebault/XmlParser.git"
+        }
+    ],
+    "require":      {
+    },
+    "require-dev":  {
+        "phpunit/phpunit": "4.3.*"
+    },
+    "autoload":     {
+        "psr-4": {
+            "Maximethebault\\XmlParser\\": "src/"
+        }
+    }
+}
