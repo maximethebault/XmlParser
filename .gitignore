@@ -1,2 +1,4 @@
 XmlParser.iml
 .idea
+vendor
+composer.lock
