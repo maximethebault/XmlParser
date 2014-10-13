@@ -16,6 +16,11 @@ class XmlFileParser extends XmlDataParser
      */
     private $_filePath;
 
+    /**
+     * @param string          $filePath        path to the XML file
+     * @param XmlParserConfig $xmlParserConfig the XML Parser config object
+     * @param  XmlRootElement $rootObject      the rpot element
+     */
     public function __construct($filePath, $xmlParserConfig, $rootObject) {
         parent::__construct($xmlParserConfig, $rootObject);
         $this->_filePath = $filePath;
