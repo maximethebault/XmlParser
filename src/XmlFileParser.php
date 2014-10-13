@@ -26,7 +26,7 @@ class XmlFileParser extends XmlDataParser
         $this->_filePath = $filePath;
     }
 
-    public function parse() {
+    public function parseFile() {
         if(!file_exists($this->_filePath)) {
             throw new Exception\FileNotFoundException('XML file on input of XmlFileDataParser not found : ' . $this->_filePath . '.');
         }
