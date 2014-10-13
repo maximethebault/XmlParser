@@ -7,7 +7,7 @@ namespace Maximethebault\XmlParser;
  *
  * Parses a XML file
  */
-class XmlFileDataParser extends XmlDataParser
+class XmlFileParser extends XmlDataParser
 {
     /**
      * Path to the XML file
@@ -16,8 +16,8 @@ class XmlFileDataParser extends XmlDataParser
      */
     private $_filePath;
 
-    public function __construct($filePath, $rootObject) {
-        parent::__construct($rootObject);
+    public function __construct($filePath, $xmlParserConfig, $rootObject) {
+        parent::__construct($xmlParserConfig, $rootObject);
         $this->_filePath = $filePath;
     }
 
