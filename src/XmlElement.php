@@ -152,7 +152,7 @@ abstract class XmlElement
     /**
      * Does a getter exist for that name?
      *
-     * @param $name name of the called getter
+     * @param $name string name of the called getter
      *
      * @return bool
      */
@@ -161,12 +161,22 @@ abstract class XmlElement
     }
 
     /**
-     * Returns the XmlElement's attributes
+     * Returns the XmlElement's attributes, or a specific one if a key is given
      *
-     * @return array
+     * @param string $name key of the attributes to retrieve
+     *
+     * @return mixed array of the attributes if no key was given, null if the key is not found, the attribute's value otherwise
      */
-    public function attrs() {
-        return $this->_attrs;
+    public function attrs($name = '') {
+        if($name == '') {
+            return $this->_attrs;
+        }
+        if(array_key_exists($name, $this->_attrs)) {
+            return $this->_attrs[$name];
+        }
+        else {
+            return null;
+        }
     }
 
     /**
@@ -182,6 +192,15 @@ abstract class XmlElement
      * @return string this element's tag name
      */
     abstract public function getName();
+
+    /**
+     * Returns the array of the children
+     *
+     * @return array
+     */
+    public function getChildren() {
+        return $this->_children;
+    }
 
     /**
      * Called by the parser whenever a tag is opened at this or a deeper depth in the XML tree
